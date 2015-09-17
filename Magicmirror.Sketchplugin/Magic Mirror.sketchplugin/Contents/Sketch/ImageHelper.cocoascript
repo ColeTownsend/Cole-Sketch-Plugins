@@ -1,0 +1,59 @@
+
+var ImageHelper = {
+
+	"getCGImage" : function(nsimage) {
+   		var rect = CGRectMake(0, 0, nsimage.size().width, nsimage.size().height);
+		var size = nsimage.size();
+		var bitmapCtx = CGBitmapContextCreate(nil, 
+												   size.width,  
+												   size.height, 
+												   8 /*bitsPerComponent*/, 
+												   0 , 
+												   [[NSColorSpace genericRGBColorSpace] CGColorSpace], 
+												   kCGBitmapByteOrder32Host|kCGImageAlphaPremultipliedFirst);
+		[NSGraphicsContext saveGraphicsState];
+		[NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:bitmapCtx flipped:false]];
+		[nsimage drawInRect:NSMakeRect(0,0, size.width, size.height) fromRect:NSZeroRect operation:NSCompositeCopy fraction:1.0];
+		[NSGraphicsContext restoreGraphicsState];
+		var imageRef = CGBitmapContextCreateImage(bitmapCtx);
+		CGContextRelease(bitmapCtx);
+		return imageRef
+	},
+
+	"getCIImage":function(cgimage) {
+		var ciimage = [CIImage imageWithCGImage:cgimage];
+		return ciimage;
+	},
+	
+	"getNSImage":function(ciimage) {
+    	var rep = [NSCIImageRep imageRepWithCIImage: ciimage];
+        var image = [[NSImage alloc] initWithSize:ciimage.extent().size];
+    	[image addRepresentation:rep];
+		return image;
+	},
+
+	"perspectiveTransform": function (nsimage, topLeft, topRight, bottomLeft, bottomRight) {
+		var cgimage = ImageHelper.getCGImage(nsimage)
+		var ciimage = ImageHelper.getCIImage(cgimage)
+    	var y = nsimage.size().height;
+    	var filter = [CIFilter filterWithName:@"CIPerspectiveTransform"];
+        [filter setValue:ciimage forKey:@"inputImage"];
+        [filter setValue:[CIVector vectorWithX:topLeft.x Y:y - topLeft.y] forKey:"inputTopLeft"];
+        [filter setValue:[CIVector vectorWithX:topRight.x Y:y - topRight.y] forKey:"inputTopRight"];
+        [filter setValue:[CIVector vectorWithX:bottomRight.x Y:y - bottomRight.y] forKey:"inputBottomRight"];
+        [filter setValue:[CIVector vectorWithX:bottomLeft.x Y:y - bottomLeft.y] forKey:"inputBottomLeft"];
+		var output = filter.outputImage() // CIImage
+		return ImageHelper.getNSImage(output)
+	},
+
+	"resizeImage": function(nsimage, nssize) {
+		var resized = [NSImage imageWithSize:nssize];
+    	[resized lockFocus]
+        var rect = NSMakeRect(0, 0, nssize.width, nssize.height)
+	    var context = NSGraphicsContext.currentContext().CGContext()
+		[nsimage drawInRect:rect];
+    	[resized unlockFocus];
+		return resized
+	},
+
+};

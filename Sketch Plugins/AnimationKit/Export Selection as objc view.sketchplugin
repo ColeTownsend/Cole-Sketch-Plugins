@@ -1,0 +1,780 @@
+// Export Selection as Objective-C view
+
+#import '../buscarini/library.js'
+
+// Model
+/*
+var ViewInfo = augment(ClassInfo,function(uber) {
+	constructor: function() {
+		uber.constructor.call(this)
+		this.layers = []
+	},
+	layers: null
+})
+
+var LayerInfo = augment.defclass({
+	constructor: function() {
+		this.syle = LayerStyle()
+	},
+	syle: null
+})
+
+var BezierLayerInfo = augment(LayerInfo, function(uber) {
+	constructor: function() {
+		uber.constructor.call(this)
+		this.points = []
+	},
+	points: null
+})
+
+var BezierLayerPoint = augment.defclass({
+	x: 0,
+	y: 0,
+	curveFromX: 0,
+	curveFromY: 0,
+	curveToX: 0,
+	curveToY: 0
+})
+
+var LayerStyle = augment.defclass({
+	constructor: function() {
+		this.fill = LayerStylePart()
+		this.border = BorderLayerStylePart()
+		this.shadow = ShadowLayerStylePart()
+	},
+	fill: null,
+	border: null,
+	shadow: null,
+	opacity: 1
+})
+
+var LayerStylePart: augment.defclass({
+	color: null
+})
+
+var BorderLayerStylePart: augment(LayerStylePart,function(uber){
+	constructor: function() {
+		uber.constructor.call(this)
+	},
+	lineWidth: 0
+})
+
+var ShadowLayerStylePart: augment(LayerStylePart,function(uber) {
+	constructor: function() {
+		uber.constructor.call(this)
+	},
+	offset: null,
+	radius: 0
+})*/
+
+// Utility functions
+
+function addAnimationValue(animationInfo,layerName,key,value) {
+	if (!animationInfo) return
+	if (!animationInfo.keyPaths[key]) animationInfo.keyPaths[key] = {}
+
+	if (animationInfo.keyPaths[key][layerName]==undefined) animationInfo.keyPaths[key][layerName] = []
+	animationInfo.keyPaths[key][layerName].push(value)
+}
+
+
+function finalLayerNameFromString(layerName) {
+	var name = com.buscarini.utils.nameForVariable(layerName)
+	return com.buscarini.utils.appendSuffixOnce(name,"Layer")
+}
+
+function finalLayerName(layer) {
+	return finalLayerNameFromString(layer.name())
+}
+
+function finalViewName(name) {
+	var viewName = com.buscarini.utils.normalizeName(name)
+	return com.buscarini.utils.appendSuffixOnce(viewName,"View")
+}
+
+
+// Processing functions
+
+function processLayerStyle(layerName,layer,generationInfo,classInfo) {
+		
+	var layerStyle = [layer style]
+
+	var performInit = classInfo.methods["performInit"]
+	if (generationInfo.currentAnimationInfo) {
+		performInit = { body: [] }
+	}
+
+	var firstFill = com.buscarini.utils.firstStylePart([layerStyle fills])
+		
+	com.buscarini.utils.dump(firstFill)
+		
+	if (firstFill) {
+		if (!com.buscarini.utils.isGradientFill(firstFill)) {
+			var fillColor = [firstFill color]
+
+			var colorString = "[UIColor colorWithRed:"+[fillColor red]+" green:"+[fillColor green]+" blue:"+[fillColor blue]+" alpha:"+[fillColor alpha]+"].CGColor"
+			
+			addAnimationValue(generationInfo.currentAnimationInfo,layerName,"fillColor","(id)" + colorString)
+
+			performInit.body.push(
+				"",
+				"\tself."+layerName+".fillColor = " + colorString + ";"
+			)			
+		}
+		else {
+			var gradient = [firstFill gradient]
+			var from = [gradient from]
+			var to = [gradient to]
+			performInit.body.push(
+				"",
+				"\tself."+layerName+".startPoint = CGPointMake(" + from.x + ","+ from.y +");",
+				"\tself."+layerName+".endPoint = CGPointMake(" + to.x + ","+ to.y +");"
+			)
+			
+			var gradientStops = [gradient stops]
+			var gradientPositions = []
+			var gradientColors = []
+			for (var i = 0; i < [gradientStops count]; i++) {
+				var gradientStop = [gradientStops objectAtIndex:i]
+
+				gradientPositions.push("@("+[gradientStop position]+")")
+				var color = [gradientStop color]
+				gradientColors.push("(id)[UIColor colorWithRed:"+[color red]+" green:"+[color green]+" blue:"+[color blue]+" alpha:"+[color alpha]+"].CGColor")
+			}
+			
+			performInit.body.push(
+				"\tself."+layerName+".locations = @["+ gradientPositions.join(",") +"];",
+				"\tself."+layerName+".colors = @["+ gradientColors.join(",") +"];"
+			)
+		}
+	}
+	
+	if (com.buscarini.utils.isGradientFill(firstFill)) {
+		layerName = layerName + "Mask"
+	}
+
+	var firstBorder = com.buscarini.utils.firstStylePart([layerStyle borders])
+
+	if (firstBorder) {
+		var borderColor = [firstBorder color]
+			
+		var colorString = "[UIColor colorWithRed:"+[borderColor red]+" green:"+[borderColor green]+" blue:"+[borderColor blue]+" alpha:"+[borderColor alpha]+"].CGColor"
+		
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"strokeColor","(id)" + colorString)
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"lineWidth","@(" + [firstBorder thickness] + ")")
+
+		performInit.body.push(
+			"",
+			"\tself."+layerName+".strokeColor = "+colorString+";",
+			"\tself."+layerName+".lineWidth = "+[firstBorder thickness]+";"
+		)
+	}
+	
+	var firstShadow = com.buscarini.utils.firstStylePart([layerStyle shadows])
+	if (firstShadow) {
+		var shadowColor = [firstShadow color]
+		
+			var colorString = "[UIColor colorWithRed:"+[shadowColor red]+" green:"+[shadowColor green]+" blue:"+[shadowColor blue]+" alpha:"+[shadowColor alpha]+"].CGColor"
+		
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"shadowColor","(id)" + colorString)
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"shadowOffset","[NSValue valueWithCGSize:CGSizeMake("+[firstShadow offsetX]+","+[firstShadow offsetY]+")]")
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"shadowRadius","@(" + [firstShadow blurRadius] + ")")
+		
+		performInit.body.push(
+			"",
+			"\tself."+layerName+".shadowColor = "+colorString+";",
+			"\tself."+layerName+".shadowOffset = CGSizeMake("+[firstShadow offsetX]+","+[firstShadow offsetY]+");",
+			"\tself."+layerName+".shadowRadius = "+[firstShadow blurRadius]+";",
+			"\tself."+layerName+".shadowOpacity = 1.0;"
+		)
+	}
+	
+	var opacity = [[[layer style] contextSettings] opacity]
+	
+	addAnimationValue(generationInfo.currentAnimationInfo,layerName,"opacity","@(" + opacity + ")")
+	
+	performInit.body.push(
+		"",
+		"\tself."+layerName+".opacity = " + opacity + ";"
+	)
+}
+
+function processPoint(layerName,index,previousPoint,previousFinalControlPoint,point,absoluteRect,rootLayer,generationInfo,method) {
+	
+	var originX = absoluteRect.x
+	var originY = absoluteRect.y
+		
+	var finalControlPoint = new Point2(0,0)
+	
+	var proportion = 1
+	
+	log("absoluteRect " + absoluteRect)	
+	//com.buscarini.utils.dump(point)
+	
+	var x = (point.point().x*absoluteRect.width+originX)*proportion
+	var y = (point.point().y*absoluteRect.height+originY)*proportion
+	var previousX = (previousPoint.point().x*absoluteRect.width+originX)*proportion
+	var previousY = (previousPoint.point().y*absoluteRect.height+originY)*proportion
+		
+	var controlPoint1x = (previousPoint.curveFrom().x*absoluteRect.width+originX)*proportion
+	var controlPoint1y = (previousPoint.curveFrom().y*absoluteRect.height+originY)*proportion
+	var controlPoint2x = (point.curveTo().x*absoluteRect.width+originX)*proportion
+	var controlPoint2y = (point.curveTo().y*absoluteRect.height+originY)*proportion
+	
+	if (index==0) {
+		method.body.push("\t["+layerName+"Path moveToPoint:CGPointMake("+x+","+y+")];")
+	}
+	else if (point.curveFrom() && point.curveTo()) {
+		// 1 straight, 2 mirrored, 3 asymmetric, 4 disconnected
+		
+		if ([point curveMode]==1) {
+			var cornerRadius = [point cornerRadius]
+			if (cornerRadius>0) {
+				var vector = new Vec2(x-previousX,y-previousY)
+				vector.normalize()
+				x += cornerRadius*vector.x
+				y += cornerRadius*vector.y
+
+				controlPoint2x = x
+				controlPoint2y = y
+					
+				var controlPointLength = bezierCircleConstant*cornerRadius/2
+				finalControlPoint.x = x-controlPointLength*vector.x
+				finalControlPoint.y = y-controlPointLength*vector.y
+			}
+			else {
+				controlPoint2x = x
+				controlPoint2y = y				
+			}
+		}
+		
+		if ([previousPoint curveMode]==1) {
+			var cornerRadius = [previousPoint cornerRadius]
+			if (cornerRadius>0) {
+				var vector = new Vec2(x-previousX,y-previousY)
+				vector.normalize()
+				previousX -= cornerRadius*vector.x
+				previousY -= cornerRadius*vector.y
+				
+				var controlPointLength = bezierCircleConstant*cornerRadius/2
+				var newControlPoint2x = previousX+controlPointLength*vector
+				var newControlPoint2y = previousY+controlPointLength*vector
+
+				var newControlPoint1x = previousFinalControlPoint.x
+				var newControlPoint1y = previousFinalControlPoint.y
+					
+				method.body.push("\t["+layerName+"Path addCurveToPoint:CGPointMake("+previousX+","+previousY+") controlPoint1:CGPointMake("+newControlPoint1x+","+newControlPoint1y+") controlPoint2:CGPointMake("+newControlPoint2x+","+newControlPoint2y+")];")
+
+				controlPoint1x = previousX
+				controlPoint1y = previousY					
+			}
+			else {
+				controlPoint1x = previousX
+				controlPoint1y = previousY
+			}
+		}
+		
+		method.body.push("\t["+layerName+"Path addCurveToPoint:CGPointMake("+x+","+y+") controlPoint1:CGPointMake("+controlPoint1x+","+controlPoint1y+") controlPoint2:CGPointMake("+controlPoint2x+","+controlPoint2y+")];")
+	}
+	else {	
+		method.body.push("\t["+layerName+"Path addLineToPoint:CGPointMake("+x+","+y+")];")
+	}
+	
+	return finalControlPoint
+}
+
+function processBezierLayerPath(layer,parentLayer,rootLayer,generationInfo,classInfo) {
+	log("processing bezier layer path " + layer)
+	
+	if(layer && layer.isKindOfClass(MSShapePathLayer)) {
+
+		var parentGroup = [layer parentGroup]
+		var frame = [layer frame]
+		var parentFrame = [parentGroup frame]
+		var absoluteRect = { x: [frame x], y: [frame y], width: [frame width],height: [frame height] }
+		absoluteRect.x += [parentFrame x]
+		absoluteRect.y += [parentFrame y]
+		
+		var layerName = finalLayerName(parentGroup)
+
+		var grandpaGroup = [parentGroup parentGroup]
+		var grandpaFrame = [grandpaGroup frame]
+		absoluteRect.x += [grandpaFrame x]
+		absoluteRect.y += [grandpaFrame y]		
+		
+		var grandpaLayerName = finalLayerName(grandpaGroup)
+
+		var path = layer.path()
+				
+		var methodName = "new"+com.buscarini.utils.firstLetterUppercase(layerName)
+		methodName += com.buscarini.utils.uniqueScriptId() //com.buscarini.utils.firstLetterUppercase(grandpaLayerName)
+		methodName += "Path"
+
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"path","(id)[self "+methodName +"].CGPath")
+		addAnimationValue(generationInfo.currentAnimationInfo,layerName,"shadowPath","(id)[self "+methodName +"].CGPath")
+						
+		var pathMethod = new Method("UIBezierPath *",methodName)
+		classInfo.methods[methodName] = pathMethod
+		pathMethod.body.push("\tUIBezierPath *"+layerName+"Path = [UIBezierPath bezierPath];","")
+
+		log("processing points")
+		com.buscarini.utils.dump(path)
+
+		var finalControlPoint = null
+			
+		var points = path.points()
+		for (var j = 0; j < [points count]; j++) {
+			
+			log("processing point: " + j)
+
+		    var point = [points objectAtIndex:j]
+
+			var previousPoint = null				
+			if (j==0) {
+			    previousPoint = [points objectAtIndex:[points count]-1]
+			}
+			else {
+			    previousPoint = [points objectAtIndex:j-1]
+			}
+			
+			finalControlPoint = processPoint(layerName,j,previousPoint,finalControlPoint,point,absoluteRect,rootLayer,generationInfo,pathMethod)
+			
+			if (j==[points count]-1) {
+				point = [points objectAtIndex:0]
+				
+			    previousPoint = [points objectAtIndex:j]
+				finalControlPoint = processPoint(layerName,j,previousPoint,finalControlPoint,point,absoluteRect,rootLayer,generationInfo,pathMethod)
+			}
+		}
+		
+		pathMethod.body.push(
+			"\t["+layerName+"Path closePath];",
+			"",
+			"\treturn "+layerName+"Path;"
+		)
+		
+		return methodName
+	}	
+}
+
+function processBezierLayer(layer,parentLayer,rootLayer,generationInfo,classInfo) {
+	log("processing bezier layer " + layer)
+	
+	if(layer && layer.isKindOfClass(MSShapePathLayer)) {
+		
+		// com.buscarini.utils.dump(layer)
+				
+		var parentGroup = [layer parentGroup]
+		var grandpaGroup = [parentGroup parentGroup]
+		var layerName = finalLayerName(parentGroup)
+		
+		var frame = [parentGroup frame]
+			
+		var currentFrame = [layer frame]
+
+		log("frame " + frame)
+		log("current frame " + currentFrame)
+			
+		var x = [frame x]
+		var y = [frame y]
+		var width = [frame width]
+		var height = [frame height]
+
+		if (parentGroup==rootLayer) {
+			x = 0
+			y = 0
+		}
+		
+		var positionX = x
+		var positionY = y
+		if (parentGroup!=rootLayer) {
+			log("grandpa frame " + [grandpaGroup frame])
+			positionX = [[grandpaGroup frame] x]
+			positionY = [[grandpaGroup frame] y]
+		}
+		
+		var positionX = positionX+width/2
+		var positionY = positionY+height/2
+		
+		if (generationInfo.currentAnimationInfo) {			
+			addAnimationValue(generationInfo.currentAnimationInfo,layerName,"position","[NSValue valueWithCGPoint:CGPointMake("+positionX+","+positionY+")]")
+			processBezierLayerPath(layer,parentLayer,rootLayer,generationInfo,classInfo)
+			processLayerStyle(layerName,parentGroup,generationInfo,classInfo)
+		}
+		else {
+			generationInfo.properties.layers.push(layerName)
+		
+			var layerProperty = null
+			var layerMaskProperty = null
+			
+			var layerMaskName = layerName + "Mask"
+				
+			var isGradient = com.buscarini.utils.isGradientLayer(parentGroup)
+				
+			if (isGradient) {
+				layerProperty = new Property("CAGradientLayer *",layerName)
+				classInfo.properties[layerName] = layerProperty
+				
+				layerMaskProperty = new Property("CAShapeLayer *",layerMaskName)
+				classInfo.properties[layerMaskName] = layerMaskProperty
+			}
+			else {
+				layerProperty = new Property("CAShapeLayer *",layerName)
+				classInfo.properties[layerName] = layerProperty				
+			}
+
+			var methodName = processBezierLayerPath(layer,parentLayer,rootLayer,generationInfo,classInfo)
+		
+			var performInit = classInfo.methods["performInit"]
+			performInit.body.push(
+				"\t// " + layerName
+			)
+		
+			if (isGradient) {
+				performInit.body.push(
+					"\tself."+layerName+" = [CAGradientLayer layer];",
+					"\tself."+layerMaskName+" = [CAShapeLayer layer];",
+					"\tself."+layerMaskName+".path = [self "+methodName+"].CGPath;",
+					"\tself."+layerMaskName+".shadowPath = self."+layerMaskName+".path;",
+					"\t[self."+layerName+" addSublayer:self."+layerMaskName+"];",
+					"\tself."+layerName+".mask = self."+layerMaskName+";"
+				)
+			}
+			else {
+				performInit.body.push(
+					"\tself."+layerName+" = [CAShapeLayer layer];",
+					"\tself."+layerName+".path = [self "+methodName+"].CGPath;",
+					"\tself."+layerName+".shadowPath = self."+layerName+".path;"
+				)
+			}
+		
+			
+		
+			performInit.body.push(
+				"",
+				"\t["+parentLayer+" insertSublayer:self."+layerName+" atIndex:0];",
+				"",
+				"\tself."+layerName+".frame = CGRectMake("+x+","+y+","+width+","+height+");",
+				""
+			)
+			
+			var layoutMethodName = "layoutLayer" + com.buscarini.utils.firstLetterUppercase(layerName)
+			var layoutLayerView = new Method("void",layoutMethodName)
+			classInfo.methods[layoutMethodName] = layoutLayerView
+
+			var layoutSubviews = classInfo.methods["layoutSubviews"]
+			layoutSubviews.body.push(
+							"\t// " + layerName,
+							"\t[self "+layoutMethodName+"];",
+							"")
+		
+			layoutLayerView.body.push(
+				"\tCGRect "+layerName+"BoundingBox = self."+layerName+".bounds;",
+		        "\t",
+				"\tCGFloat "+layerName+"BoundingBoxAspectRatio = CGRectGetWidth("+layerName+"BoundingBox)/CGRectGetHeight("+layerName+"BoundingBox);",
+				"\tCGFloat "+layerName+"ViewAspectRatio = CGRectGetWidth(self.frame)/CGRectGetHeight(self.frame);",
+		        "\t",
+				"\tCGFloat "+layerName+"ScaleFactor = 1.0;",
+				"\tif ("+layerName+"BoundingBoxAspectRatio > "+layerName+"ViewAspectRatio) {",
+				"\t	"+layerName+"ScaleFactor = CGRectGetWidth(self.frame)/CGRectGetWidth("+layerName+"BoundingBox);",
+				"\t} else {",
+				"\t	"+layerName+"ScaleFactor = CGRectGetHeight(self.frame)/CGRectGetHeight("+layerName+"BoundingBox);",
+				"\t}",
+		        "\t",
+				"\tCATransform3D transform = CATransform3DIdentity;",
+				"\ttransform = CATransform3DTranslate(transform,(self.bounds.size.width-"+layerName+"BoundingBox.size.width)/2, (self.bounds.size.height-"+layerName+"BoundingBox.size.height)/2, 0);",
+				"\ttransform = CATransform3DScale(transform, "+layerName+"ScaleFactor, "+layerName+"ScaleFactor, "+layerName+"ScaleFactor);",
+				"\tself."+layerName+".transform = transform;"
+			)
+		
+			processLayerStyle(layerName,parentGroup,generationInfo,classInfo)
+			performInit.body.push("")
+		
+			return layerName
+		}
+	}
+	
+	return null
+}
+
+function processContainerLayer(layer,parentLayer,rootLayer,generationInfo,classInfo) {
+	var layerName = finalLayerName(layer)
+	var frame = [layer frame]
+	
+	var layerProperty = new Property("CALayer *",layerName)
+		
+	classInfo.properties[layerName] = layerProperty
+	
+	var x = [frame x]
+	var y = [frame y]
+		
+	if (generationInfo.currentLevel==0) {
+		x = 0
+		y = 0
+	}
+	
+	var performInit = classInfo.methods["performInit"]
+	
+	performInit.body.push(
+		"\t// " + layerName,
+		"\tself."+layerName+" = [CALayer layer];",
+		"",
+		"\t["+parentLayer+" insertSublayer:self."+layerName+" atIndex:0];",
+		"",
+		"\tself."+layerName+".frame = CGRectMake("+x+","+y+","+[frame width]+","+[frame height]+");",
+		""
+	)
+	
+	return layerName
+}
+
+function processAnimationKey(keyPath,animationInfo,classInfo) {
+	// Generate animations
+	var animationDic = animationInfo.keyPaths[keyPath]
+	for (var key in animationDic) {
+	    if (animationDic.hasOwnProperty(key)) {
+			var animationValues = animationDic[key]
+			
+			if (com.buscarini.utils.allValuesEqual(animationValues)) return
+
+			var animationValuesString = animationValues.join(",")
+			
+			var layerName = key
+
+			var repeatCount = animationInfo.repeatCount
+			if (repeatCount=="always" || repeatCount=="infinite") repeatCount = "HUGE_VALF"
+
+			var animationName = layerName+com.buscarini.utils.firstLetterUppercase(keyPath)+"Animation"
+
+			var animationMethod = classInfo.methods[animationInfo.animationName]
+			animationMethod.body.push(
+				"\tCAKeyframeAnimation *"+animationName+" = [CAKeyframeAnimation animationWithKeyPath:@\""+keyPath+"\"];",
+				"\t"+animationName+".duration = "+animationInfo.duration+";",
+				"\t"+animationName+".timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];",
+				"\t"+animationName+".repeatCount = "+repeatCount+";",
+				"\t"+animationName+".autoreverses = YES;",
+				"\t"+animationName+".values = @["+animationValuesString+"];",
+				"\t[self."+layerName+" addAnimation:"+animationName+" forKey:@\""+keyPath+"\"];",
+				""
+			)
+		}
+	}
+}
+
+function processLayerAnimation(layer,parentLayer,rootLayer,generationInfo,classInfo) {
+	log("processing layer animation for " + layer)
+		
+	if (com.buscarini.utils.isGroup(layer)) {
+		if (com.buscarini.utils.isAnimation(layer)) {
+			generationInfo.currentAnimationInfo = com.buscarini.utils.readAnimationParameters(layer)
+			
+			var animationMethod = new IBActionMethod(generationInfo.currentAnimationInfo.animationName)
+			classInfo.methods[generationInfo.currentAnimationInfo.animationName] = animationMethod
+			generationInfo.animations.push(generationInfo.currentAnimationInfo.animationName)
+				
+			generationInfo.currentAnimationInfo.keyPaths = {}
+
+			// Process sublayers
+		    var sublayers = [layer layers];
+		    for (var sub=([sublayers count] - 1); sub >= 0; sub--) {
+		        var sublayer = [sublayers objectAtIndex:sub]
+				generationInfo.currentLevel = generationInfo.currentLevel+1		
+				processLayer(sublayer,parentLayer,rootLayer,generationInfo,classInfo)
+				generationInfo.currentLevel = generationInfo.currentLevel-1
+			}
+			
+			// Generate animations
+			processAnimationKey("position",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("opacity",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("path",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("shadowPath",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("fillColor",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("strokeColor",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("lineWidth",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("shadowColor",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("shadowOffset",generationInfo.currentAnimationInfo,classInfo)
+			processAnimationKey("shadowRadius",generationInfo.currentAnimationInfo,classInfo)
+						
+			generationInfo.currentAnimationInfo = null
+		}
+		else {
+			// Process sublayers
+		    var sublayers = [layer layers];
+		    for (var sub=([sublayers count] - 1); sub >= 0; sub--) {
+		        var sublayer = [sublayers objectAtIndex:sub]
+				generationInfo.currentLevel = generationInfo.currentLevel+1		
+				processLayer(sublayer,parentLayer,rootLayer,generationInfo,classInfo)
+				generationInfo.currentLevel = generationInfo.currentLevel-1
+			}
+		}
+	}
+	else {
+		processBezierLayer(layer,parentLayer,rootLayer,generationInfo,classInfo)		
+	}
+}
+
+function processLayer(layer,parentLayer,rootLayer,generationInfo,classInfo) {
+	log("processing layer " + layer)
+
+	if (!layer || !com.buscarini.utils.isVisible(layer)) return null
+			
+	if (com.buscarini.utils.isGroup(layer)) {
+		if (com.buscarini.utils.isAnimation(layer) || generationInfo.currentAnimationInfo) {
+			processLayerAnimation(layer,parentLayer,rootLayer,generationInfo,classInfo)
+		}
+		else {
+			var layerName = processContainerLayer(layer,parentLayer,rootLayer,generationInfo,classInfo)
+			
+		    var sublayers = [layer layers];
+		    for (var sub=([sublayers count] - 1); sub >= 0; sub--) {
+		        var sublayer = [sublayers objectAtIndex:sub]
+				generationInfo.currentLevel = generationInfo.currentLevel+1
+				processLayer(sublayer,"self."+layerName,rootLayer,generationInfo,classInfo)
+				generationInfo.currentLevel = generationInfo.currentLevel-1
+			}
+		}
+	}
+	else if (layer.isKindOfClass(MSShapeGroup))  {
+
+		var layerCopy = [layer duplicate]
+		[layerCopy flatten]
+
+		sublayer = [[layerCopy layers] objectAtIndex:0]
+
+		if (layer==rootLayer) {
+			rootLayer = layerCopy
+		}
+			
+		generationInfo.currentLevel = generationInfo.currentLevel+1
+		processLayer(sublayer,parentLayer,rootLayer,generationInfo,classInfo)
+		generationInfo.currentLevel = generationInfo.currentLevel-1
+
+		[layerCopy removeFromParent]
+	}
+	else if (layer.isKindOfClass(MSShapePathLayer)) {
+		if (generationInfo.currentAnimationInfo) {
+			processLayerAnimation(layer,parentLayer,rootLayer,generationInfo,classInfo)
+		}
+		else {
+			processBezierLayer(layer,parentLayer,rootLayer,generationInfo,classInfo)
+				
+		}
+	}
+}
+
+function main() {
+
+	if ([selection count]<=0) {
+		[doc showMessage:"Nothing selected"];
+	}
+	else {
+		var viewName = null
+		if ([selection count]==1) {
+			var selectedLayer = selection[0]
+			viewName = finalViewName(selectedLayer.name())
+		}
+		else {
+			viewName = finalViewName([doc askForUserInput:"View class name?" initialValue:"MyView"])
+		}
+	
+		var panel = [NSOpenPanel openPanel]
+
+		[panel setAllowsMultipleSelection:false];
+		[panel setCanChooseDirectories:true];
+		[panel setCanChooseFiles:false];
+	
+		var result = [panel runModal]
+		
+		if (result != NSFileHandlingPanelOKButton) return
+		
+		var path = [[panel URLs] lastObject];
+
+		var generationInfo = { methods : {
+									paths : {}
+											},
+								properties : {
+									layers : []
+								},
+								animations : [],
+								currentLevel : 0,
+								currentAnimationInfo : null
+							}
+
+		var headerFile = [path URLByAppendingPathComponent:viewName + ".h"]
+		var implementationFile = [path URLByAppendingPathComponent:viewName + ".m"]
+
+		var classInfo = new ClassInfo(viewName)
+		classInfo.parentClass = "UIView"
+		classInfo.designable = true
+	
+		var uikitImport = new Import("UIKit/UIKit.h")
+		uikitImport.relative = false
+		uikitImport.public = true
+		classInfo.imports["uikit"] = uikitImport
+			
+		var quartzCoreImport = new Import("QuartzCore/QuartzCore.h")
+		quartzCoreImport.relative = false
+		quartzCoreImport.public = false
+		classInfo.imports["quartzCore"] = quartzCoreImport
+		
+		var initFrameMethod = new Method("id","initWithFrame")
+		initFrameMethod.public = false
+		initFrameMethod.parameters.push(new Parameter(null,"CGRect","frame"))
+		initFrameMethod.body.push(
+								"\tself = [super initWithFrame:frame];",
+								"\tif (self) {",
+								"\t\t[self performInit];",
+								"\t}",
+								"\treturn self;"
+								)
+		classInfo.methods['initFrame'] = initFrameMethod
+								
+		var initCoderMethod = new Method("id","initWithCoder")
+		initCoderMethod.public = false
+		initCoderMethod.parameters.push(new Parameter(null,"NSCoder *","aDecoder"))
+		initCoderMethod.body.push(
+								"\tself = [super initWithCoder:aDecoder];",
+								"\tif (self) {",
+								"\t\t[self performInit];",
+								"\t}",
+								"\treturn self;"
+								)
+		classInfo.methods['initCoder'] = initCoderMethod
+								
+		var performInitMethod = new Method("void","performInit")
+		performInitMethod.public = false
+		classInfo.methods['performInit'] = performInitMethod
+		
+		var layoutSubviewsMethod = new Method("void","layoutSubviews")
+		layoutSubviewsMethod.public = false
+		classInfo.methods['layoutSubviews'] = layoutSubviewsMethod
+
+		for (var i=0; i<[selection count]; i++) {
+			var layer = [selection objectAtIndex:i];
+			processLayer(layer,"self.layer",layer,generationInfo,classInfo)
+		}
+
+		var header = com.buscarini.objc.generateHeader(classInfo)
+		var implementation = com.buscarini.objc.generateImplementation(classInfo)
+
+		var fileManager = [NSFileManager defaultManager];
+	
+		var headerString = [NSString stringWithString:header]
+
+		if ([headerString writeToURL:headerFile atomically:true encoding:NSUTF8StringEncoding error:null]) {
+			var implementationString = [NSString stringWithString:implementation]
+			if ([implementationString writeToURL:implementationFile atomically:true encoding:NSUTF8StringEncoding error:null]) {
+				[doc showMessage:"Done"];
+			}			
+			else {
+				[doc showMessage:"Error writing files"];				
+			}
+		}
+		else {
+			[doc showMessage:"Error writing files"];
+		}
+	}
+
+}
+
+main()

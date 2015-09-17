@@ -1,0 +1,41 @@
+{
+  "author" : "James Tang",
+  "commands" : [
+    {
+      "script" : "script.cocoascript",
+      "handler" : "mirrorPage",
+      "shortcut" : "control shift m",
+      "name" : "Magic Mirror!",
+      "identifier" : "magic mirror"
+    },
+    {
+      "script" : "script.cocoascript",
+      "handler" : "jumpToArtboard",
+      "shortcut" : "control shift j",
+      "name" : "Jump To Artboard",
+      "identifier" : "jump to artboard",
+    },
+    {
+      "script" : "script.cocoascript",
+      "handler" : "rotatePoints",
+      "shortcut" : "control command shift r",
+      "name" : "Rotate Points",
+      "identifier" : "rotate points",
+    },
+  ],
+  "menu" : {
+    "isRoot" : false,
+    "shortcut" : "",
+    "items" : [
+      "magic mirror",
+      "jump to artboard",
+      "rotate points",
+    ],
+    "title" : "Magic Mirror"
+  },
+  "identifier" : "com.example.sketch.5301e707-a904-423e-8008-eb5b02bfbbbb",
+  "version" : "1.0",
+  "description" : "Mirror contents in an Artboard and apply to a Shape with perspective transform. It's like 'Smart Objects' for Sketch.",
+  "authorEmail" : "j@jamztang.com",
+  "name" : "Magic Mirror"
+}

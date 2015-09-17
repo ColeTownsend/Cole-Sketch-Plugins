@@ -1,0 +1,47 @@
+// Change font (ctrl a)
+var font_name = [doc askForUserInput:"Font name:" initialValue:"Arial"];
+
+function check_layer(layer){
+  log("Checking layer " + layer + " of klass: " + [layer class])
+  switch ([layer class]) {
+    case MSTextLayer:
+      log("Found text layer!")
+      layer.setFontPostscriptName(font_name);
+      break;
+    case MSPage:
+    case MSLayerGroup:
+    case MSArtboardGroup:
+      var sublayers = [layer layers];
+      log("This is a group/artboard/page with " + [sublayers length] + " sublayers")
+      for(var i=0; i < [sublayers length]; i++) {
+        var sublayer = sublayers[i];
+        check_layer(sublayer);
+      }
+      break;
+  }
+}
+
+log("################################################################")
+
+// Use selection, if any
+if(selection && [selection length]){
+  for (var i = 0; i < [selection length]; i++) {
+    check_layer(selection[i]);
+  }
+} else {
+  // Otherwise, loop trough pages, artboards & layers
+  var pages = [doc pages];
+  for (var i = 0; i < [pages length]; i++) {
+    var current_page = pages[i];
+    if ([[current_page artboards] length]) {
+      log("Traversing artboards")
+      for (var i = 0; i < [[current_page artboards] length]; i++) {
+        var artboard = [current_page artboards][i]
+        check_layer(artboard)
+      }
+    } else {
+      log("Page has no artboards")
+      check_layer(current_page)
+    }
+  }
+}

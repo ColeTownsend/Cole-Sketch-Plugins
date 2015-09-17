@@ -1,0 +1,35 @@
+var LayerHelper = {
+
+	"fillBottom": function(mslayer, nsimage) {
+		var fill = mslayer.style().fills().firstObject();
+		if (fill == nil) {
+    		fill = mslayer.style().fills().addNewStylePart();
+		}
+		fill.setFillType(4);
+		fill.setPatternFillType(1);
+		fill.setPatternImage(nsimage);
+	},
+
+	"fillColor": function(mslayer, hex) {
+		var fill = mslayer.style().fills().firstObject();
+		if (fill == nil) {
+    		fill = mslayer.style().fills().addNewStylePart();
+		}
+		fill.setFillType(0);
+		fill.setColor([MSColor colorWithSVGString:hex])
+	},
+	
+	"getBezierPath": function(msshapegroup) {
+		return msshapegroup.bezierPath()
+	},
+
+	"getBezierPathInBounds": function(msshapegroup) {
+		return msshapegroup.bezierPathInBounds()
+	},
+
+	"getImage": function(mslayer, mslayerflattener) {
+		var layers = [MSLayerArray arrayWithLayer:mslayer];
+		var image = [mslayerflattener imageFromLayers:layers];
+		return image
+	},
+}
